@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#EEF2EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1620" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Phát âm">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Luyện phát âm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.40.0/distrib/browser/microsoft.cognitiveservices.speech.sdk.bundle-min.js"></script>
+<style>
+:root{
+  --bg:#EEF2EF;--surface:#FFFFFF;--ink:#142033;--muted:#5B6676;--line:#D5DDD8;
+  --accent:#2448D8;--accent-ink:#FFFFFF;--accent-soft:#DFE6FF;
+  --good:#13824F;--ok:#AD720A;--bad:#C8352E;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0F1620;--surface:#18212D;--ink:#E8EDF3;--muted:#9AA6B5;--line:#2A3543;
+    --accent:#7C98FF;--accent-ink:#0F1620;--accent-soft:#222E4E;
+    --good:#45C98F;--ok:#E6B450;--bad:#F2756D;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+.ipa{font-family:"Noto Sans","Charis SIL","Doulos SIL","Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:6px;padding:10px 12px;max-width:640px;margin:0 auto}
+.brand{flex:1;font-weight:700;font-size:1.15rem;letter-spacing:-.01em;margin:0}
+.brand .ipa{display:block;color:var(--accent);font-weight:400;font-size:.82rem;letter-spacing:.02em}
+.title{flex:1;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.count{color:var(--muted);font-size:.9rem;min-width:64px;text-align:right;padding-right:6px}
+.icon-btn{border:0;background:transparent;padding:8px 10px;border-radius:10px;color:var(--muted);font-size:.95rem;font-weight:500}
+.icon-btn:active{background:var(--line)}
+.wrap{max-width:640px;margin:0 auto;padding:6px 18px 48px}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--line);padding:4px;border-radius:12px;margin:4px 0 6px}
+.seg button{border:0;background:transparent;padding:10px;border-radius:9px;font-weight:600;color:var(--muted)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(20,32,51,.14)}
+h2.group{font-size:.95rem;font-weight:600;color:var(--muted);margin:22px 2px 8px}
+.list{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:0;background:transparent;padding:14px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row:active{background:var(--bg)}
+.lead{width:44px;height:44px;flex:none;border-radius:12px;background:var(--bg);display:grid;place-items:center;font-size:1.35rem}
+.lead.ipa{font-size:1.05rem;color:var(--accent);background:var(--accent-soft)}
+.row .t{flex:1;min-width:0}
+.row .t b{display:block;font-weight:600}
+.row .t small{color:var(--muted)}
+.prog{height:4px;background:var(--line);border-radius:4px;margin-top:6px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--good)}
+.chev{color:var(--muted);font-size:1.2rem}
+
+.notice{margin-top:18px;padding:14px 16px;border-radius:14px;background:var(--accent-soft)}
+.notice p{margin:0 0 10px}
+textarea,input[type=text],input[type=password],select{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px}
+textarea{min-height:110px;resize:vertical;font-size:1.1rem}
+.btn{border:0;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:12px 18px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn[disabled]{opacity:.5}
+.actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.del{border:0;background:transparent;color:var(--muted);padding:6px 8px;font-size:1.1rem}
+
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:22px 18px 16px}
+.target{font-size:clamp(1.5rem,6.2vw,2.05rem);font-weight:600;line-height:1.35;letter-spacing:-.01em;margin:0 0 16px}
+.words{display:flex;flex-wrap:wrap;gap:4px 2px;margin:-4px -6px 14px}
+.w{border:0;background:transparent;padding:4px 6px 3px;border-radius:10px;display:inline-flex;flex-direction:column;align-items:center}
+.w .wt{font-size:clamp(1.5rem,6.2vw,2.05rem);font-weight:600;line-height:1.25}
+.w .wp{font-size:.92rem;margin-top:2px;line-height:1.35;letter-spacing:.02em}
+.w.g .wt{color:var(--good)}
+.w.o .wt{color:var(--ok)}
+.w.b .wt{color:var(--bad)}
+.w.x .wt{color:var(--muted);text-decoration:line-through}
+.w[aria-pressed="true"]{background:var(--accent-soft)}
+.p-g{color:var(--good)} .p-o{color:var(--ok)} .p-b{color:var(--bad);font-weight:700}
+.listen{display:flex;gap:8px;flex-wrap:wrap}
+.pill{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:8px 15px;font-weight:500;display:inline-flex;gap:7px;align-items:center}
+.pill svg{width:16px;height:16px}
+.pill[disabled]{opacity:.5}
+
+.mic{display:flex;flex-direction:column;align-items:center;margin:26px 0 6px}
+.rec{--lvl:0;width:86px;height:86px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 0 0 calc(6px + var(--lvl) * 26px) var(--accent-soft);transition:box-shadow .08s linear,background .15s}
+.rec.on{background:var(--bad)}
+.rec svg{width:34px;height:34px}
+.rec[disabled]{opacity:.55}
+.hint{color:var(--muted);font-size:.93rem;margin:14px 0 0;min-height:1.5em;text-align:center}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px}
+.score{display:flex;align-items:center;gap:20px}
+.big{font-size:3.4rem;font-weight:700;line-height:1;letter-spacing:-.03em}
+.big small{display:block;font-size:.9rem;font-weight:500;letter-spacing:0;color:var(--muted);margin-top:6px}
+.subs{flex:1;display:grid;gap:5px;font-size:.93rem}
+.sub{display:flex;justify-content:space-between;gap:8px}
+.sub span{color:var(--muted)}
+.fix{border-top:1px solid var(--line);padding:13px 0 3px;margin-top:13px}
+.fix h3{font-size:1rem;margin:0 0 4px;font-weight:600}
+.fix .sym{font-size:1.2rem;color:var(--bad);margin-right:6px}
+.fix p{margin:0}
+.fix .heard{color:var(--muted);font-size:.92rem;margin-bottom:3px}
+.ai{white-space:pre-wrap;margin:0}
+.muted{color:var(--muted)}
+.pager{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.pager .btn{flex:1}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.stat b{display:block;font-size:1.8rem;line-height:1.1}
+.stat span{color:var(--muted);font-size:.9rem}
+.sc{font-weight:700;min-width:36px;text-align:right}
+.field{margin:14px 0}
+.field label{display:block;font-weight:600;margin-bottom:6px}
+.field small{display:block;color:var(--muted);margin-top:5px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;max-width:min(92vw,520px);font-size:.93rem;z-index:20;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:reduce){.rec{transition:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+/* ================= Dữ liệu bài học ================= */
+const TOPICS = [
+  {id:'greet', group:'situ', lead:'👋', name:'Chào hỏi và giới thiệu', items:[
+    "Hello, nice to meet you.","My name is Nga, and I work as a business analyst.","How have you been lately?","I'm from Vietnam. I live in Hanoi.","It was great talking to you.","Could you say that again, please?","Let me introduce my colleague.","See you next week."]},
+  {id:'work', group:'situ', lead:'💼', name:'Công việc và họp', items:[
+    "Let's get started with today's agenda.","Could you share your screen, please?","I'd like to clarify the requirements first.","We need to finalize the scope by Friday.","Does anyone have any questions?","I'll send the meeting notes this afternoon.","The deadline is quite tight, but it's achievable.","Thank you all for your time."]},
+  {id:'interview', group:'situ', lead:'🤝', name:'Phỏng vấn', items:[
+    "Thank you for having me today.","I have five years of experience in data projects.","My greatest strength is solving complex problems.","I enjoy working with cross-functional teams.","I'm looking for new challenges and growth.","Could you tell me more about the team?","What does success look like in this role?","I look forward to hearing from you."]},
+  {id:'food', group:'situ', lead:'☕', name:'Nhà hàng và cà phê', items:[
+    "Can I have an iced latte, please?","A table for two, please.","What would you recommend?","I'd like the chicken salad without onions.","Could we get the bill, please?","Is the service charge included?","This dish is absolutely delicious.","Can I get this to go?"]},
+  {id:'travel', group:'situ', lead:'✈️', name:'Du lịch và sân bay', items:[
+    "Where is the check-in counter?","I'd like a window seat, please.","How long does it take to get to the city center?","My luggage hasn't arrived yet.","Could you call a taxi for me?","I have a reservation under the name Nga.","What time is checkout?","Is there a pharmacy near here?"]},
+  {id:'shop', group:'situ', lead:'🛍️', name:'Mua sắm', items:[
+    "How much does this cost?","Do you have this in a smaller size?","Can I try it on?","I'm just looking, thanks.","Do you accept credit cards?","Could I get a receipt, please?","It's a bit too expensive for me.","I'd like to return this item."]},
+
+  {id:'end', group:'sound', lead:'-s -t', name:'Âm cuối: -s, -z, -t, -d', desc:'Lỗi nuốt âm cuối', items:[
+    "cats","dogs","bridges","watched","played","wanted","She likes books and maps.","He worked hard and finished early."]},
+  {id:'th', group:'sound', lead:'θ ð', name:'Âm /θ/ và /ð/', desc:'think, this', items:[
+    "think","three","thank you","this","mother","weather","I think this is the third one.","They thanked their father."]},
+  {id:'sh', group:'sound', lead:'ʃ s', name:'Âm /ʃ/ và /s/', desc:'she, see', items:[
+    "she","see","ship","sip","shoes","sure","She sells seashells by the seashore.","Should I sign the sheet?"]},
+  {id:'ee', group:'sound', lead:'iː ɪ', name:'Âm /iː/ dài và /ɪ/ ngắn', desc:'sheep, ship', items:[
+    "sheep","ship","leave","live","seat","sit","Please sit in this seat.","Please leave it in the living room."]},
+  {id:'rl', group:'sound', lead:'r l', name:'Âm /r/ và /l/', desc:'right, light', items:[
+    "right","light","road","load","really","world","The rabbit ran along the river.","Laura really likes red roses."]},
+  {id:'stress', group:'sound', lead:'ˈ‿', name:'Trọng âm và nối âm', desc:'photograph, pick it up', items:[
+    "photograph","photography","comfortable","vegetable","Pick it up.","Turn it off and on again.","What are you up to?","Not at all."]},
+];
+const WEAK_TO_SET = {'θ':'th','ð':'th','ʃ':'sh','ʒ':'sh','s':'sh','i':'ee','iː':'ee','ɪ':'ee','ɹ':'rl','r':'rl','l':'rl','t':'end','d':'end','z':'end'};
+
+const TIPS = {
+  'θ':'Đặt đầu lưỡi giữa hai hàm răng, thổi hơi nhẹ ra, cổ họng không rung. Đừng đọc thành /t/ hay "th" tiếng Việt.',
+  'ð':'Giống /θ/ (lưỡi giữa hai răng) nhưng cổ họng rung, đặt tay lên cổ sẽ thấy rung. Đừng đọc thành /d/ hay /z/.',
+  'ʃ':'Chu tròn môi ra trước, lưỡi lùi về sau hơn so với /s/, thổi hơi tạo tiếng "sh" dày.',
+  'ʒ':'Khẩu hình như /ʃ/ nhưng cổ họng rung, như âm giữa trong "measure".',
+  's':'Hai hàm răng gần chạm nhau, đầu lưỡi sau răng trên, xì hơi rõ. Ở cuối từ phải giữ âm, không bỏ.',
+  'z':'Như /s/ nhưng cổ họng rung, nghe như tiếng ong "zzz". Đuôi -s sau âm hữu thanh thường đọc là /z/.',
+  'tʃ':'Chạm lưỡi lên nướu răng trên rồi bật ra kèm tiếng "sh", môi hơi tròn. Mạnh và bật hơi hơn "ch" tiếng Việt.',
+  'dʒ':'Khẩu hình như /tʃ/ nhưng cổ họng rung, như "j" trong "job".',
+  'ɹ':'Cong đầu lưỡi lùi về sau, không chạm vòm miệng, môi hơi tròn. Không rung lưỡi như "r" tiếng Việt.',
+  'r':'Cong đầu lưỡi lùi về sau, không chạm vòm miệng, môi hơi tròn. Không rung lưỡi như "r" tiếng Việt.',
+  'l':'Đầu lưỡi chạm nướu sau răng trên. Ở cuối từ (như "feel"), giữ lưỡi chạm và hạ phần sau lưỡi, đừng nuốt mất âm.',
+  'i':'Âm "i" dài: kéo căng môi sang hai bên như đang cười và giữ lâu hơn một chút.',
+  'iː':'Âm "i" dài: kéo căng môi sang hai bên như đang cười và giữ lâu hơn một chút.',
+  'ɪ':'Âm "i" ngắn và lỏng: miệng hơi mở, lưỡi thả lỏng, nghe gần giữa "i" và "ê". Đừng kéo dài.',
+  'æ':'Mở miệng rộng, hạ hàm, lưỡi thấp và hơi đẩy ra trước, nghe giữa "a" và "e".',
+  'ʌ':'Giống "ă" tiếng Việt: ngắn, miệng mở vừa, thả lỏng.',
+  'ɑ':'Mở miệng rộng, lưỡi lùi về sau, như "a" kéo dài.',
+  'ɑː':'Mở miệng rộng, lưỡi lùi về sau, như "a" kéo dài.',
+  'ɔ':'Môi tròn, miệng mở vừa, như "o" tiếng Việt nhưng dài hơn.',
+  'ə':'Âm "ơ" rất nhẹ và ngắn, dùng ở âm tiết không nhấn. Đừng đọc rõ thành nguyên âm đầy đủ.',
+  'ɝ':'Âm "ơ" kèm cong lưỡi về sau như /r/, như trong "work", "bird".',
+  'ɚ':'Âm "ơ" nhẹ kèm cong lưỡi, như cuối từ "teacher".',
+  'ɜː':'Âm "ơ" dài, miệng thả lỏng, như trong "work", "bird".',
+  'ʊ':'Âm "u" ngắn: môi tròn nhẹ, không chu căng.',
+  'u':'Âm "u" dài: chu tròn môi ra trước và giữ lâu.',
+  'uː':'Âm "u" dài: chu tròn môi ra trước và giữ lâu.',
+  'eɪ':'Trượt từ "ê" sang "i", gần như "ây". Đừng đọc thành "ê" đơn.',
+  'aɪ':'Trượt từ "a" sang "i", như "ai".',
+  'oʊ':'Trượt từ "ô" sang "u", môi tròn dần, như "âu" tròn môi. Đừng đọc thành "ô" đơn.',
+  'əʊ':'Trượt từ "ơ" sang "u", môi tròn dần.',
+  'aʊ':'Trượt từ "a" sang "u", như "ao".',
+  'ɔɪ':'Trượt từ "o" sang "i", như "oi".',
+  'ŋ':'Cuống lưỡi chạm vòm mềm như "ng" tiếng Việt, không bật thêm /g/ phía sau.',
+  't':'Chặn đầu lưỡi lên nướu răng trên. Ở cuối từ, bật nhẹ hơi, đừng bỏ âm.',
+  'd':'Chặn đầu lưỡi lên nướu như /t/ nhưng có rung. Ở cuối từ đừng biến thành /t/ hay bỏ mất.',
+  'k':'Cuống lưỡi chạm vòm mềm rồi bật hơi. Ở cuối từ vẫn phải nghe thấy.',
+  'g':'Như /k/ nhưng có rung cổ họng.',
+  'p':'Bật hơi mạnh khi /p/ ở đầu từ (đặt tờ giấy trước miệng sẽ thấy lay).',
+  'b':'Hai môi mím rồi mở, có rung, không bật hơi mạnh.',
+  'v':'Răng trên chạm nhẹ môi dưới, cổ họng rung. Không thay bằng /b/ hay /w/.',
+  'f':'Răng trên chạm nhẹ môi dưới, thổi hơi, không rung.',
+  'w':'Chu tròn môi rồi mở nhanh sang nguyên âm sau, như "qu" nhẹ.',
+  'j':'Như "d" giọng miền Nam hay "y": lưỡi nâng gần vòm cứng rồi trượt ra.',
+  'h':'Thở hơi nhẹ ra từ cổ họng, đừng bỏ âm.',
+  'm':'Mím hai môi, hơi đi qua mũi. Ở cuối từ giữ môi khép.',
+  'n':'Đầu lưỡi chạm nướu, hơi đi qua mũi. Ở cuối từ giữ lưỡi chạm.',
+};
+const tipFor = ph => TIPS[ph] || TIPS[ph.replace(/ː/g,'')] || null;
+
+/* ================= Lưu trữ ================= */
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+let settings = Object.assign({azureKey:'',azureRegion:'southeastasia',claudeKey:'',accent:'en-US',voice:'female'}, LS.get('pa.settings',{}));
+let history_ = LS.get('pa.hist',[]);
+let mine = LS.get('pa.mine',[]);
+const VOICES = {'en-US':{female:'en-US-AvaNeural',male:'en-US-AndrewNeural'},'en-GB':{female:'en-GB-SoniaNeural',male:'en-GB-RyanNeural'}};
+
+/* ================= Trạng thái ================= */
+const S = {view:'home', tab:'topics', items:[], idx:0, title:'', result:null, selWord:null,
+           recording:false, busy:false, myUrl:null, aiText:null, aiBusy:false, customText:''};
+const app = document.getElementById('app');
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cls = v => v>=80?'g':v>=60?'o':'b';
+const round = v => v==null?null:Math.round(v);
+const curText = () => S.items[S.idx] || '';
+
+function toast(msg, ms=3200){
+  const t=document.getElementById('toast'); t.textContent=msg; t.hidden=false;
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.hidden=true},ms);
+}
+
+/* ================= Âm thanh: phát ================= */
+const player = new Audio();
+player.setAttribute('playsinline','');
+let silentUrl = null;
+document.addEventListener('pointerdown', function unlock(){
+  if(!silentUrl) silentUrl = URL.createObjectURL(wavBlob(new Int16Array(800),16000));
+  player.src = silentUrl; player.play().catch(()=>{});
+  document.removeEventListener('pointerdown', unlock, true);
+}, true);
+
+function playUrl(url){
+  return new Promise(res=>{
+    player.onended=()=>res(); player.onerror=()=>res();
+    player.src=url; player.play().catch(()=>res());
+  });
+}
+
+const ttsCache = new Map();
+async function speak(text, slow){
+  const lang=settings.accent, voice=VOICES[lang][settings.voice];
+  if(!settings.azureKey || !window.SpeechSDK){ return browserSpeak(text, slow); }
+  const key=`${voice}|${slow?1:0}|${text}`;
+  if(!ttsCache.has(key)){
+    const url = await new Promise((resolve,reject)=>{
+      const cfg = SpeechSDK.SpeechConfig.fromSubscription(settings.azureKey.trim(), settings.azureRegion.trim());
+      cfg.speechSynthesisOutputFormat = SpeechSDK.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
+      const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}"><voice name="${voice}"><prosody rate="${slow?'-35%':'0%'}">${esc(text)}</prosody></voice></speak>`;
+      synth.speakSsmlAsync(ssml, r=>{
+        synth.close();
+        if(r.reason===SpeechSDK.ResultReason.SynthesizingAudioCompleted){
+          resolve(URL.createObjectURL(new Blob([r.audioData],{type:'audio/mpeg'})));
+        } else reject(new Error(azureMsg(r.errorDetails)));
+      }, e=>{ synth.close(); reject(new Error(azureMsg(String(e)))); });
+    });
+    ttsCache.set(key,url);
+  }
+  return playUrl(ttsCache.get(key));
+}
+function browserSpeak(text, slow){
+  return new Promise(res=>{
+    if(!('speechSynthesis' in window)){ toast('Thiết bị không hỗ trợ đọc mẫu. Hãy nhập khóa Azure trong Cài đặt.'); return res(); }
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text); u.lang=settings.accent; u.rate=slow?0.65:0.95;
+    const v=speechSynthesis.getVoices().find(v=>v.lang && v.lang.replace('_','-').startsWith(settings.accent));
+    if(v) u.voice=v;
+    u.onend=res; u.onerror=res; speechSynthesis.speak(u);
+  });
+}
+function azureMsg(d){
+  d=String(d||'');
+  if(/401|Authentication|Unauthorized|invalid subscription/i.test(d)) return 'Khóa Azure hoặc vùng (region) không đúng. Kiểm tra lại trong Cài đặt.';
+  if(/1006|Unable to contact|connection|websocket/i.test(d)) return 'Không kết nối được Azure. Kiểm tra mạng và vùng (region).';
+  if(/quota|429|throttl/i.test(d)) return 'Đã vượt hạn mức Azure. Chờ một lúc hoặc kiểm tra gói đăng ký.';
+  return 'Lỗi Azure: '+d.slice(0,160);
+}
+
+/* ================= Âm thanh: ghi ================= */
+let rec=null;
+async function startRec(){
+  if(!window.SpeechSDK){ toast('Chưa tải được thư viện Azure. Kiểm tra kết nối mạng rồi mở lại app.'); return; }
+  if(!settings.azureKey){ toast('Cần nhập khóa Azure để chấm điểm.'); go('settings'); return; }
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
+  }catch(e){ toast('App chưa được dùng micro. Hãy cho phép micro trong cài đặt trình duyệt.'); return; }
+  const Ctx = window.AudioContext||window.webkitAudioContext;
+  const ctx = new Ctx(); await ctx.resume();
+  const src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096,1,1);
+  const chunks=[];
+  proc.onaudioprocess = e=>{
+    const d=e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d));
+    let s=0; for(let i=0;i<d.length;i+=8) s+=d[i]*d[i];
+    const lvl=Math.min(1, Math.sqrt(s/(d.length/8))*6);
+    const b=document.querySelector('.rec'); if(b) b.style.setProperty('--lvl', lvl.toFixed(2));
+  };
+  src.connect(proc); proc.connect(ctx.destination);
+  rec={stream,ctx,src,proc,chunks,timer:setTimeout(stopRec,30000)};
+  resetResult(); S.recording=true; render();
+}
+async function stopRec(){
+  if(!rec) return;
+  const r=rec; rec=null; clearTimeout(r.timer);
+  try{ r.proc.disconnect(); r.src.disconnect(); }catch(e){}
+  r.stream.getTracks().forEach(t=>t.stop());
+  const rate=r.ctx.sampleRate; r.ctx.close();
+  S.recording=false;
+  let len=0; r.chunks.forEach(c=>len+=c.length);
+  const all=new Float32Array(len); let o=0; r.chunks.forEach(c=>{all.set(c,o);o+=c.length;});
+  const pcm=downsample(all,rate,16000);
+  if(pcm.length<16000*0.4){ render(); toast('Bản ghi quá ngắn. Chạm nút micro, đọc xong rồi chạm lần nữa để dừng.'); return; }
+  const int16=toInt16(pcm);
+  if(S.myUrl) URL.revokeObjectURL(S.myUrl);
+  S.myUrl=URL.createObjectURL(wavBlob(int16,16000));
+  S.busy=true; render();
+  const text=curText();
+  try{
+    const segs=await assess(int16,text);
+    if(text!==curText()) return;
+    const res=analyze(segs,text);
+    S.result=res; S.busy=false;
+    if(!res.words.length || res.spokenCount===0){
+      S.result=null; render(); toast('Không nghe rõ giọng bạn. Thử nói to và gần micro hơn.'); return;
+    }
+    saveHistory(text,res);
+    render();
+    const p=document.querySelector('.panel'); if(p) p.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){ S.busy=false; render(); toast(e.message||String(e),5000); }
+}
+function downsample(buf,inRate,outRate){
+  if(inRate===outRate) return buf;
+  const ratio=inRate/outRate, len=Math.floor(buf.length/ratio), out=new Float32Array(len);
+  let pos=0;
+  for(let i=0;i<len;i++){
+    const next=Math.floor((i+1)*ratio); let sum=0,c=0;
+    for(let j=pos;j<next&&j<buf.length;j++){sum+=buf[j];c++;}
+    out[i]=c?sum/c:0; pos=next;
+  }
+  return out;
+}
+function toInt16(f){ const o=new Int16Array(f.length); for(let i=0;i<f.length;i++){ const s=Math.max(-1,Math.min(1,f[i])); o[i]=s<0?s*0x8000:s*0x7FFF; } return o; }
+function wavBlob(int16,rate){
+  const buf=new ArrayBuffer(44+int16.length*2), v=new DataView(buf);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,'RIFF'); v.setUint32(4,36+int16.length*2,true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,'data'); v.setUint32(40,int16.length*2,true); new Int16Array(buf,44).set(int16);
+  return new Blob([buf],{type:'audio/wav'});
+}
+
+/* ================= Chấm điểm Azure ================= */
+function assess(int16,refText){
+  return new Promise((resolve,reject)=>{
+    const sdk=SpeechSDK;
+    const cfg=sdk.SpeechConfig.fromSubscription(settings.azureKey.trim(), settings.azureRegion.trim());
+    cfg.speechRecognitionLanguage=settings.accent;
+    const push=sdk.AudioInputStream.createPushStream(sdk.AudioStreamFormat.getWaveFormatPCM(16000,16,1));
+    push.write(int16.buffer.slice(0));
+    push.write(new Int16Array(16000*0.8).buffer);
+    push.close();
+    const pa=new sdk.PronunciationAssessmentConfig(refText, sdk.PronunciationAssessmentGradingSystem.HundredMark, sdk.PronunciationAssessmentGranularity.Phoneme, true);
+    pa.phonemeAlphabet='IPA';
+    pa.nbestPhonemeCount=5;
+    if(settings.accent==='en-US') pa.enableProsodyAssessment=true;
+    const recog=new sdk.SpeechRecognizer(cfg, sdk.AudioConfig.fromStreamInput(push));
+    pa.applyTo(recog);
+    const segs=[]; let done=false;
+    const finish=err=>{
+      if(done) return; done=true; clearTimeout(to);
+      recog.stopContinuousRecognitionAsync(()=>recog.close(),()=>recog.close());
+      err?reject(err):resolve(segs);
+    };
+    recog.recognized=(s,e)=>{
+      if(e.result.reason===sdk.ResultReason.RecognizedSpeech){
+        try{ segs.push(JSON.parse(e.result.properties.getProperty(sdk.PropertyId.SpeechServiceResponse_JsonResult))); }catch(x){}
+      }
+    };
+    recog.canceled=(s,e)=>{ e.reason===sdk.CancellationReason.Error ? finish(new Error(azureMsg(e.errorDetails))) : finish(); };
+    recog.sessionStopped=()=>finish();
+    const to=setTimeout(()=>finish(segs.length?null:new Error('Azure phản hồi quá lâu. Thử lại sau.')),45000);
+    recog.startContinuousRecognitionAsync(()=>{}, err=>finish(new Error(azureMsg(err))));
+  });
+}
+
+function analyze(segs,refText){
+  const words=[], fl=[], pr=[];
+  let single=null;
+  for(const j of segs){
+    const nb=j.NBest&&j.NBest[0]; if(!nb) continue;
+    const pa=nb.PronunciationAssessment||{}, n=(nb.Words||[]).length||1;
+    if(pa.FluencyScore!=null) fl.push([pa.FluencyScore,n]);
+    if(pa.ProsodyScore!=null) pr.push([pa.ProsodyScore,n]);
+    words.push(...(nb.Words||[]));
+    single=pa;
+  }
+  const et=w=>(w.PronunciationAssessment||{}).ErrorType||'None';
+  const spoken=words.filter(w=>et(w)!=='Omission'&&et(w)!=='Insertion');
+  const refCount=refText.split(/\s+/).filter(w=>/[A-Za-z0-9]/.test(w)).length||1;
+  const wavg=a=>{ let s=0,n=0; a.forEach(([v,k])=>{s+=v*k;n+=k}); return n?s/n:null; };
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  let accuracy=avg(spoken.map(w=>(w.PronunciationAssessment||{}).AccuracyScore||0));
+  let completeness=Math.min(100,spoken.length/refCount*100);
+  let fluency=wavg(fl)||0, prosody=wavg(pr);
+  let overall=prosody!=null ? accuracy*.4+fluency*.2+completeness*.2+prosody*.2 : accuracy*.6+fluency*.2+completeness*.2;
+  if(segs.length===1 && single && single.PronScore!=null){
+    overall=single.PronScore; accuracy=single.AccuracyScore; completeness=single.CompletenessScore??completeness;
+  }
+  if(!spoken.length) overall=0;
+  const issues=[];
+  words.forEach((w,wi)=>{
+    if(et(w)==='Omission'||et(w)==='Insertion') return;
+    (w.Phonemes||[]).forEach(p=>{
+      const pa=p.PronunciationAssessment||{}, sc=pa.AccuracyScore??100;
+      if(sc<60){
+        const nb=pa.NBestPhonemes||[];
+        const heard=nb[0]&&nb[0].Phoneme&&nb[0].Phoneme!==p.Phoneme?nb[0].Phoneme:null;
+        issues.push({word:w.Word,wi,ph:p.Phoneme,score:sc,heard});
+      }
+    });
+  });
+  issues.sort((a,b)=>a.score-b.score);
+  const omitted=words.filter(w=>et(w)==='Omission').map(w=>w.Word);
+  return {words,accuracy,fluency,completeness,prosody,overall,issues,omitted,spokenCount:spoken.length,
+          recognized:segs.map(s=>s.DisplayText||'').join(' ').trim()};
+}
+
+/* ================= Lịch sử ================= */
+function saveHistory(text,res){
+  const weak=[...new Set(res.issues.map(i=>i.ph))].slice(0,6);
+  history_.push({t:Date.now(),text,score:Math.round(res.overall),weak});
+  if(history_.length>1000) history_=history_.slice(-1000);
+  LS.set('pa.hist',history_);
+}
+function bestScores(){ const m={}; history_.forEach(h=>{ m[h.text]=Math.max(m[h.text]||0,h.score); }); return m; }
+
+/* ================= Nhận xét AI (Claude) ================= */
+async function askAI(){
+  const r=S.result; if(!r||!settings.claudeKey) return;
+  S.aiBusy=true; S.aiText=null; render();
+  const summary={
+    reference:curText(), recognized:r.recognized, accent:settings.accent,
+    scores:{overall:round(r.overall),accuracy:round(r.accuracy),fluency:round(r.fluency),completeness:round(r.completeness),prosody:round(r.prosody)},
+    omitted:r.omitted,
+    words:r.words.map(w=>({word:w.Word,score:round((w.PronunciationAssessment||{}).AccuracyScore),error:(w.PronunciationAssessment||{}).ErrorType,
+      phonemes:(w.Phonemes||[]).map(p=>{ const pa=p.PronunciationAssessment||{}, nb=(pa.NBestPhonemes||[])[0];
+        return {ipa:p.Phoneme,score:round(pa.AccuracyScore),heard:nb&&nb.Phoneme!==p.Phoneme?nb.Phoneme:undefined}; })}))
+  };
+  const system='Bạn là giáo viên dạy phát âm tiếng Anh cho người Việt. Dựa trên kết quả chấm phát âm của Azure (JSON), viết nhận xét bằng tiếng Việt, tối đa 150 từ, giọng thân thiện và cụ thể: một câu nhận xét chung; tối đa 3 lỗi quan trọng nhất (từ nào, âm nào, người học đang phát âm gần giống âm gì, cách đặt lưỡi, môi, răng để sửa, có liên hệ lỗi điển hình của người Việt nếu phù hợp); cuối cùng một mẹo luyện tập ngắn. Viết ký hiệu IPA trong dấu /…/. Không dùng tiêu đề markdown, không in đậm; có thể dùng gạch đầu dòng ngắn. Nếu điểm đã rất tốt, khen ngắn gọn và gợi ý cách nói tự nhiên hơn.';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{
+      'content-type':'application/json','x-api-key':settings.claudeKey.trim(),
+      'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-5-5',max_tokens:2000,system,
+        messages:[{role:'user',content:'Kết quả chấm:\n'+JSON.stringify(summary)}]})});
+    const data=await resp.json();
+    if(!resp.ok) throw new Error(resp.status===401?'Khóa Claude không đúng. Kiểm tra trong Cài đặt.':(data.error&&data.error.message)||('Lỗi '+resp.status));
+    S.aiText=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').replace(/\*\*/g,'').trim()||'Không có nhận xét.';
+  }catch(e){ S.aiText=null; toast(e.message||String(e),5000); }
+  S.aiBusy=false; render();
+}
+
+/* ================= Điều hướng ================= */
+function go(view,push=true){
+  if(S.recording) stopRec();
+  S.view=view;
+  if(push) history.pushState({view},'');
+  render(); window.scrollTo(0,0);
+}
+window.addEventListener('popstate',e=>{ S.view=(e.state&&e.state.view)||'home'; if(S.view==='practice'&&!S.items.length) S.view='home'; render(); });
+function resetResult(){ S.result=null; S.selWord=null; S.aiText=null; S.aiBusy=false; }
+function openPractice(items,idx,title){ S.items=items; S.idx=idx; S.title=title; resetResult(); go('practice'); }
+
+/* ================= Giao diện ================= */
+const ICON={
+  play:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  slow:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>',
+  mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
+  me:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>',
+};
+
+function homeTop(){
+  return `<header class="top"><h1 class="brand">Luyện phát âm <span class="ipa">/prəˌnʌnsiˈeɪʃən/</span></h1>
+    <button class="icon-btn" data-act="go" data-v="history">Tiến bộ</button>
+    <button class="icon-btn" data-act="go" data-v="settings">Cài đặt</button></header>`;
+}
+function backTop(title,right=''){
+  return `<header class="top"><button class="icon-btn" data-act="back">‹ Quay lại</button>
+    <div class="title">${esc(title)}</div><div class="count">${right}</div></header>`;
+}
+
+function vHome(){
+  const best=bestScores();
+  const row=t=>{
+    const done=t.items.filter(i=>(best[i]||0)>=80).length;
+    return `<button class="row" data-act="topic" data-id="${t.id}">
+      <span class="lead ${t.group==='sound'?'ipa':''}">${esc(t.lead)}</span>
+      <span class="t"><b>${esc(t.name)}</b><small>${t.desc?esc(t.desc)+', ':''}${t.items.length} bài, đạt ${done}</small>
+      <span class="prog"><i style="width:${done/t.items.length*100}%"></i></span></span>
+      <span class="chev">›</span></button>`;
+  };
+  const topics=`<h2 class="group">Tình huống thường gặp</h2><div class="list">${TOPICS.filter(t=>t.group==='situ').map(row).join('')}</div>
+    <h2 class="group">Âm khó với người Việt</h2><div class="list">${TOPICS.filter(t=>t.group==='sound').map(row).join('')}</div>`;
+  const custom=`<div class="field" style="margin-top:18px"><label for="ct">Từ hoặc câu bạn muốn luyện</label>
+      <textarea id="ct" lang="en" placeholder="Ví dụ: The quarterly report is attached." autocapitalize="sentences">${esc(S.customText)}</textarea></div>
+    <div class="actions"><button class="btn" data-act="practiceCustom">Luyện ngay</button>
+      <button class="btn ghost" data-act="saveCustom">Lưu vào danh sách</button></div>
+    ${mine.length?`<h2 class="group">Danh sách của tôi</h2><div class="list">${mine.map((m,i)=>`
+      <div class="row" style="padding:6px 6px 6px 16px"><button class="row" style="padding:8px 0;border:0" data-act="mine" data-i="${i}">
+        <span class="t"><b lang="en">${esc(m)}</b>${best[m]!=null?`<small>Điểm cao nhất ${best[m]}</small>`:''}</span></button>
+        <button class="del" data-act="delMine" data-i="${i}" aria-label="Xóa">✕</button></div>`).join('')}</div>`:''}`;
+  const notice=!settings.azureKey?`<div class="notice"><p>Để chấm điểm phát âm, app cần khóa Azure Speech. Hướng dẫn lấy khóa có trong file HUONG-DAN.</p>
+    <button class="btn" data-act="go" data-v="settings">Nhập khóa</button></div>`:'';
+  return `${homeTop()}<main class="wrap">
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="${S.tab==='topics'}" data-act="tab" data-v="topics">Theo chủ đề</button>
+      <button role="tab" aria-selected="${S.tab==='custom'}" data-act="tab" data-v="custom">Tự luyện</button>
+    </div>${notice}${S.tab==='topics'?topics:custom}</main>`;
+}
+
+function wordsHtml(r){
+  return `<div class="words" lang="en">${r.words.map((w,i)=>{
+    const pa=w.PronunciationAssessment||{}, e=pa.ErrorType||'None';
+    if(e==='Insertion') return '';
+    const c=e==='Omission'?'x':cls(pa.AccuracyScore??0);
+    const ph=e==='Omission'?'<span class="muted">bị bỏ</span>':(w.Phonemes||[]).map(p=>`<span class="p-${cls((p.PronunciationAssessment||{}).AccuracyScore??100)}">${esc(p.Phoneme)}</span>`).join('');
+    return `<button class="w ${c}" data-act="word" data-i="${i}" aria-pressed="${S.selWord===i}"><span class="wt">${esc(w.Word)}</span><span class="wp ipa">/${ph}/</span></button>`;
+  }).join('')}</div>`;
+}
+
+function fixHtml(list){
+  return list.map(i=>{
+    const tip=tipFor(i.ph);
+    return `<div class="fix"><h3><span class="sym ipa">/${esc(i.ph)}/</span>trong “${esc(i.word)}”</h3>
+      ${i.heard?`<p class="heard">Bạn đang đọc gần giống <span class="ipa">/${esc(i.heard)}/</span></p>`:''}
+      <p>${tip?esc(tip):'Nghe mẫu chậm và chú ý khẩu hình ở âm này.'}</p></div>`;
+  }).join('');
+}
+
+function vPractice(){
+  const text=curText(), r=S.result, n=S.items.length;
+  let detail='';
+  if(r){
+    let fixes;
+    if(S.selWord!=null){
+      const w=r.words[S.selWord];
+      const own=r.issues.filter(i=>i.wi===S.selWord);
+      fixes=`<div class="fix"><h3 lang="en">${esc(w.Word)}: ${round((w.PronunciationAssessment||{}).AccuracyScore)??'–'} điểm</h3>
+        <div class="listen" style="margin-top:8px"><button class="pill" data-act="sayWord" data-w="${esc(w.Word)}">${ICON.play}Nghe từ này</button>
+        <button class="pill" data-act="sayWordSlow" data-w="${esc(w.Word)}">${ICON.slow}Chậm</button></div></div>
+        ${own.length?fixHtml(own):'<div class="fix"><p class="muted">Từ này không có âm nào bị sai rõ.</p></div>'}`;
+    } else {
+      const seen=new Set(), top=[];
+      r.issues.forEach(i=>{ if(!seen.has(i.ph)&&top.length<3){ seen.add(i.ph); top.push(i); } });
+      fixes = top.length ? fixHtml(top) : '<div class="fix"><p>Không có âm nào bị sai rõ. Thử nói nhanh và tự nhiên hơn.</p></div>';
+      if(r.omitted.length) fixes+=`<div class="fix"><p>Bạn đã bỏ sót: <span lang="en">${r.omitted.map(esc).join(', ')}</span></p></div>`;
+    }
+    const label=r.overall>=85?'Rất tốt':r.overall>=70?'Khá tốt':r.overall>=50?'Cần luyện thêm':'Thử lại nhé';
+    detail=`<section class="panel" aria-live="polite">
+      <div class="score"><div class="big" style="color:var(--${{g:'good',o:'ok',b:'bad'}[cls(r.overall)]})">${round(r.overall)}<small>${label}</small></div>
+      <div class="subs">
+        <div class="sub"><span>Chính xác</span><b>${round(r.accuracy)}</b></div>
+        <div class="sub"><span>Trôi chảy</span><b>${round(r.fluency)}</b></div>
+        <div class="sub"><span>Đầy đủ</span><b>${round(r.completeness)}</b></div>
+        ${r.prosody!=null?`<div class="sub"><span>Ngữ điệu</span><b>${round(r.prosody)}</b></div>`:''}
+      </div></div>
+      <div class="listen" style="margin-top:14px">
+        <button class="pill" data-act="playMe">${ICON.me}Nghe lại giọng bạn</button>
+        <button class="pill" data-act="compare">${ICON.play}Mẫu rồi đến bạn</button></div>
+      ${S.selWord==null?'<p class="muted" style="margin:12px 0 0;font-size:.92rem">Chạm vào một từ để xem chi tiết.</p>':''}
+      ${fixes}
+      ${settings.claudeKey?`<div class="fix">${S.aiText?`<p class="ai">${esc(S.aiText)}</p>`:
+        `<button class="btn ghost" data-act="ai" ${S.aiBusy?'disabled':''}>${S.aiBusy?'Đang viết nhận xét…':'Nhận xét chi tiết bằng AI'}</button>`}</div>`:''}
+    </section>`;
+  }
+  const hint=S.recording?'Đang nghe… chạm để dừng':S.busy?'Đang chấm điểm…':r?'Chạm để thử lại':'Chạm để nói';
+  return `${backTop(S.title, n>1?`${S.idx+1}/${n}`:'')}<main class="wrap">
+    <section class="stage">
+      ${r?wordsHtml(r):`<p class="target" lang="en">${esc(text)}</p>`}
+      <div class="listen"><button class="pill" data-act="play" ${S.recording?'disabled':''}>${ICON.play}Nghe mẫu</button>
+        <button class="pill" data-act="slow" ${S.recording?'disabled':''}>${ICON.slow}Nghe chậm</button></div>
+    </section>
+    <div class="mic"><button class="rec ${S.recording?'on':''}" data-act="rec" ${S.busy?'disabled':''} aria-label="${S.recording?'Dừng ghi âm':'Bắt đầu ghi âm'}">${S.recording?ICON.stop:ICON.mic}</button>
+      <p class="hint">${hint}</p></div>
+    ${detail}
+    ${n>1?`<nav class="pager"><button class="btn ghost" data-act="prev" ${S.idx===0?'disabled':''}>Câu trước</button>
+      <button class="btn ghost" data-act="next" ${S.idx===n-1?'disabled':''}>Câu tiếp</button></nav>`:''}
+  </main>`;
+}
+
+function vHistory(){
+  const now=Date.now(), wk=history_.filter(h=>now-h.t<7*864e5);
+  const avg=a=>a.length?Math.round(a.reduce((s,h)=>s+h.score,0)/a.length):'–';
+  const days=new Set(history_.map(h=>new Date(h.t).toDateString())).size;
+  const cnt={}; history_.slice(-200).forEach(h=>(h.weak||[]).forEach(p=>cnt[p]=(cnt[p]||0)+1));
+  const weak=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const recent=history_.slice(-30).reverse();
+  return `${backTop('Tiến bộ')}<main class="wrap">
+    ${history_.length?`<div class="stats">
+      <div class="stat"><b>${history_.length}</b><span>lượt luyện, ${days} ngày</span></div>
+      <div class="stat"><b>${avg(wk)}</b><span>điểm trung bình 7 ngày</span></div></div>
+    ${weak.length?`<h2 class="group">Âm bạn hay sai nhất</h2><div class="list">${weak.map(([p,c])=>`
+      <button class="row" ${WEAK_TO_SET[p]?`data-act="topic" data-id="${WEAK_TO_SET[p]}"`:`data-act="weakTip" data-p="${esc(p)}"`}>
+        <span class="lead ipa">${esc(p)}</span><span class="t"><b>Sai ${c} lần</b>
+        <small>${WEAK_TO_SET[p]?'Chạm để luyện bộ bài cho âm này':'Chạm để xem mẹo'}</small></span><span class="chev">›</span></button>`).join('')}</div>`:''}
+    <h2 class="group">Gần đây</h2><div class="list">${recent.map(h=>`
+      <button class="row" data-act="replay" data-t="${esc(h.text)}"><span class="t"><b lang="en">${esc(h.text)}</b>
+        <small>${new Date(h.t).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></span>
+        <span class="sc" style="color:var(--${{g:'good',o:'ok',b:'bad'}[cls(h.score)]})">${h.score}</span></button>`).join('')}</div>`
+    :`<div class="notice"><p>Chưa có lượt luyện nào. Chọn một chủ đề hoặc tự nhập câu để bắt đầu.</p>
+      <button class="btn" data-act="back">Bắt đầu luyện</button></div>`}
+  </main>`;
+}
+
+function vSettings(){
+  return `${backTop('Cài đặt')}<main class="wrap">
+    <div class="field"><label for="ak">Khóa Azure Speech (Key 1)</label>
+      <input id="ak" type="password" autocomplete="off" value="${esc(settings.azureKey)}" data-set="azureKey">
+      <small>Bắt buộc để chấm điểm. Khóa chỉ lưu trên điện thoại này.</small></div>
+    <div class="field"><label for="ar">Vùng (Region)</label>
+      <input id="ar" type="text" autocomplete="off" autocapitalize="off" value="${esc(settings.azureRegion)}" data-set="azureRegion">
+      <small>Ghi đúng như trên Azure, ví dụ southeastasia, eastasia, japaneast.</small></div>
+    <div class="field"><label for="ck">Khóa Claude API (không bắt buộc)</label>
+      <input id="ck" type="password" autocomplete="off" value="${esc(settings.claudeKey)}" data-set="claudeKey">
+      <small>Dùng cho nút “Nhận xét chi tiết bằng AI”. Bỏ trống thì app vẫn có mẹo sửa từng âm.</small></div>
+    <div class="field"><label for="ac">Giọng chuẩn</label>
+      <select id="ac" data-set="accent"><option value="en-US" ${settings.accent==='en-US'?'selected':''}>Anh – Mỹ (có chấm ngữ điệu)</option>
+      <option value="en-GB" ${settings.accent==='en-GB'?'selected':''}>Anh – Anh</option></select></div>
+    <div class="field"><label for="vo">Giọng đọc mẫu</label>
+      <select id="vo" data-set="voice"><option value="female" ${settings.voice==='female'?'selected':''}>Nữ</option>
+      <option value="male" ${settings.voice==='male'?'selected':''}>Nam</option></select></div>
+    <div class="actions"><button class="btn" data-act="test">Kiểm tra kết nối</button>
+      <button class="btn ghost" data-act="clearHist">Xóa lịch sử luyện</button></div>
+  </main>`;
+}
+
+function render(){
+  app.innerHTML = S.view==='practice'?vPractice():S.view==='history'?vHistory():S.view==='settings'?vSettings():vHome();
+}
+
+/* ================= Sự kiện ================= */
+const A={
+  go:b=>go(b.dataset.v),
+  back:()=>{ if(history.state&&history.state.view&&history.state.view!=='home') history.back(); else go('home'); },
+  tab:b=>{ S.tab=b.dataset.v; render(); },
+  topic:b=>{ const t=TOPICS.find(x=>x.id===b.dataset.id); if(t) openPractice(t.items,0,t.name); },
+  practiceCustom:()=>{ const v=S.customText.trim(); if(!v) return toast('Nhập một từ hoặc câu tiếng Anh trước.'); openPractice([v],0,'Tự luyện'); },
+  saveCustom:()=>{ const v=S.customText.trim(); if(!v) return toast('Nhập một từ hoặc câu tiếng Anh trước.');
+    if(!mine.includes(v)){ mine.unshift(v); LS.set('pa.mine',mine); } S.customText=''; render(); toast('Đã lưu vào danh sách.'); },
+  mine:b=>openPractice(mine.slice(),+b.dataset.i,'Danh sách của tôi'),
+  delMine:b=>{ mine.splice(+b.dataset.i,1); LS.set('pa.mine',mine); render(); },
+  replay:b=>openPractice([b.dataset.t],0,'Luyện lại'),
+  weakTip:b=>{ const t=tipFor(b.dataset.p); toast(t?`/${b.dataset.p}/: ${t}`:'Chưa có mẹo cho âm này.',7000); },
+  play:()=>speak(curText(),false).catch(e=>toast(e.message)),
+  slow:()=>speak(curText(),true).catch(e=>toast(e.message)),
+  sayWord:b=>speak(b.dataset.w,false).catch(e=>toast(e.message)),
+  sayWordSlow:b=>speak(b.dataset.w,true).catch(e=>toast(e.message)),
+  rec:()=>{ S.recording?stopRec():startRec(); },
+  word:b=>{ const i=+b.dataset.i; S.selWord=S.selWord===i?null:i; render(); },
+  playMe:()=>{ if(S.myUrl) playUrl(S.myUrl); },
+  compare:async()=>{ try{ await speak(curText(),false); if(S.myUrl) await playUrl(S.myUrl); }catch(e){ toast(e.message); } },
+  ai:()=>askAI(),
+  prev:()=>{ if(S.idx>0){ S.idx--; resetResult(); render(); } },
+  next:()=>{ if(S.idx<S.items.length-1){ S.idx++; resetResult(); render(); } },
+  test:async()=>{
+    if(!settings.azureKey) return toast('Chưa nhập khóa Azure.');
+    try{ await speak('Your settings are working.',false); toast('Kết nối Azure thành công.'); }catch(e){ toast(e.message,5000); }
+  },
+  clearHist:()=>{ if(confirm('Xóa toàn bộ lịch sử luyện tập trên máy này?')){ history_=[]; LS.set('pa.hist',history_); toast('Đã xóa lịch sử.'); } },
+};
+app.addEventListener('click',e=>{ const b=e.target.closest('[data-act]'); if(b&&!b.disabled&&A[b.dataset.act]) A[b.dataset.act](b); });
+app.addEventListener('input',e=>{ if(e.target.id==='ct') S.customText=e.target.value; });
+app.addEventListener('change',e=>{
+  const k=e.target.dataset.set; if(!k) return;
+  settings[k]=e.target.value.trim(); LS.set('pa.settings',settings);
+  if(k==='accent'||k==='voice') ttsCache.clear();
+});
+
+history.replaceState({view:'home'},'');
+render();
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
