@@ -110,6 +110,8 @@ textarea{min-height:110px;resize:vertical;font-size:1.1rem}
 .vi-head b{display:block;font-weight:600}
 .vi-head small{display:block;color:var(--muted)}
 .vi-said{margin:12px 0 0;color:var(--muted)}
+.vi-head>div{flex:1;min-width:0}
+.clear{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 13px;font-weight:500;font-size:.9rem;color:var(--muted);flex:none}
 .mean{color:var(--muted);margin:-8px 0 14px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px}
 .score{display:flex;align-items:center;gap:20px}
@@ -592,7 +594,8 @@ function vHome(){
   const viHint=viOn?'Đang nghe… chạm để dừng':S.viBusy?'Đang dịch sang tiếng Anh…':'Chạm micro và nói ý bạn muốn diễn đạt';
   const custom=`<div class="vi-box"><div class="vi-head">
       <button class="rec sm ${viOn?'on':''}" data-act="recVi" ${S.viBusy?'disabled':''} aria-label="${viOn?'Dừng ghi âm':'Nói bằng tiếng Việt'}">${viOn?ICON.stop:ICON.mic}</button>
-      <div><b>Nói bằng tiếng Việt</b><small>${viHint}</small></div></div>
+      <div><b>Nói bằng tiếng Việt</b><small>${viHint}</small></div>
+      ${(S.viText||S.customText.trim())&&!viOn&&!S.viBusy?`<button class="clear" data-act="clearVi" aria-label="Xóa câu đang luyện">✕ Xóa</button>`:''}</div>
       ${S.viText?`<p class="vi-said">Bạn nói: “${esc(S.viText)}”</p>`:''}</div>
     <div class="field" style="margin-top:18px"><label for="ct">${S.viText?'Câu tiếng Anh tương ứng (sửa được)':'Hoặc gõ từ, câu tiếng Anh bạn muốn luyện'}</label>
       <textarea id="ct" lang="en" placeholder="Ví dụ: The quarterly report is attached." autocapitalize="sentences">${esc(S.customText)}</textarea></div>
@@ -755,6 +758,7 @@ const A={
   rec:()=>{ S.recording?stopRec():startRec('assess'); },
   recVi:()=>{ S.recording?stopRec():startRec('vi'); },
   alts:()=>suggestAlts(),
+  clearVi:()=>{ S.viText=''; S.customText=''; S.alts=null; S.altsBusy=false; render(); },
   pickAlt:b=>{ S.customText=S.alts[+b.dataset.i]; S.alts=null; render(); },
   word:b=>{ const i=+b.dataset.i; S.selWord=S.selWord===i?null:i; render(); },
   playMe:()=>{ if(S.myUrl) playUrl(S.myUrl); },
