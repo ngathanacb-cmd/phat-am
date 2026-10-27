@@ -103,6 +103,14 @@ textarea{min-height:110px;resize:vertical;font-size:1.1rem}
 .rec[disabled]{opacity:.55}
 .hint{color:var(--muted);font-size:.93rem;margin:14px 0 0;min-height:1.5em;text-align:center}
 
+.rec.sm{width:56px;height:56px;flex:none;box-shadow:0 0 0 calc(4px + var(--lvl) * 16px) var(--accent-soft)}
+.rec.sm svg{width:24px;height:24px}
+.vi-box{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.vi-head{display:flex;gap:14px;align-items:center}
+.vi-head b{display:block;font-weight:600}
+.vi-head small{display:block;color:var(--muted)}
+.vi-said{margin:12px 0 0;color:var(--muted)}
+.mean{color:var(--muted);margin:-8px 0 14px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px}
 .score{display:flex;align-items:center;gap:20px}
 .big{font-size:3.4rem;font-weight:700;line-height:1;letter-spacing:-.03em}
@@ -226,11 +234,13 @@ const LS = {
 let settings = Object.assign({azureKey:'',azureRegion:'southeastasia',claudeKey:'',accent:'en-US',voice:'female'}, LS.get('pa.settings',{}));
 let history_ = LS.get('pa.hist',[]);
 let mine = LS.get('pa.mine',[]);
+let meanings = LS.get('pa.mean',{});
+function saveMeaning(en){ if(S.viText&&en){ meanings[en]=S.viText; LS.set('pa.mean',meanings); } }
 const VOICES = {'en-US':{female:'en-US-AvaNeural',male:'en-US-AndrewNeural'},'en-GB':{female:'en-GB-SoniaNeural',male:'en-GB-RyanNeural'}};
 
 /* ================= Trạng thái ================= */
 const S = {view:'home', tab:'topics', items:[], idx:0, title:'', result:null, selWord:null,
-           recording:false, busy:false, myUrl:null, aiText:null, aiBusy:false, customText:''};
+           recording:false, busy:false, myUrl:null, aiText:null, aiBusy:false, customText:'', recMode:null, viText:'', viBusy:false, alts:null, altsBusy:false};
 const app = document.getElementById('app');
 const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cls = v => v>=80?'g':v>=60?'o':'b';
@@ -301,7 +311,7 @@ function azureMsg(d){
 
 /* ================= Âm thanh: ghi ================= */
 let rec=null;
-async function startRec(){
+async function startRec(mode='assess'){
   if(!window.SpeechSDK){ toast('Chưa tải được thư viện Azure. Kiểm tra kết nối mạng rồi mở lại app.'); return; }
   if(!settings.azureKey){ toast('Cần nhập khóa Azure để chấm điểm.'); go('settings'); return; }
   let stream;
@@ -320,8 +330,9 @@ async function startRec(){
     const b=document.querySelector('.rec'); if(b) b.style.setProperty('--lvl', lvl.toFixed(2));
   };
   src.connect(proc); proc.connect(ctx.destination);
-  rec={stream,ctx,src,proc,chunks,timer:setTimeout(stopRec,30000)};
-  resetResult(); S.recording=true; render();
+  rec={stream,ctx,src,proc,chunks,mode,timer:setTimeout(stopRec,30000)};
+  if(mode==='assess') resetResult();
+  S.recording=true; S.recMode=mode; render();
 }
 async function stopRec(){
   if(!rec) return;
@@ -335,6 +346,7 @@ async function stopRec(){
   const pcm=downsample(all,rate,16000);
   if(pcm.length<16000*0.4){ render(); toast('Bản ghi quá ngắn. Chạm nút micro, đọc xong rồi chạm lần nữa để dừng.'); return; }
   const int16=toInt16(pcm);
+  if(r.mode==='vi') return handleVi(int16);
   if(S.myUrl) URL.revokeObjectURL(S.myUrl);
   S.myUrl=URL.createObjectURL(wavBlob(int16,16000));
   S.busy=true; render();
@@ -408,6 +420,43 @@ function assess(int16,refText){
   });
 }
 
+function translateVi(int16){
+  return new Promise((resolve,reject)=>{
+    const sdk=SpeechSDK;
+    const cfg=sdk.SpeechTranslationConfig.fromSubscription(settings.azureKey.trim(), settings.azureRegion.trim());
+    cfg.speechRecognitionLanguage='vi-VN';
+    cfg.addTargetLanguage('en');
+    const push=sdk.AudioInputStream.createPushStream(sdk.AudioStreamFormat.getWaveFormatPCM(16000,16,1));
+    push.write(int16.buffer.slice(0)); push.write(new Int16Array(16000*0.8).buffer); push.close();
+    const recog=new sdk.TranslationRecognizer(cfg, sdk.AudioConfig.fromStreamInput(push));
+    const vi=[], en=[]; let done=false;
+    const finish=err=>{
+      if(done) return; done=true; clearTimeout(to);
+      recog.stopContinuousRecognitionAsync(()=>recog.close(),()=>recog.close());
+      err?reject(err):resolve({vi:vi.join(' ').trim(), en:en.join(' ').trim()});
+    };
+    recog.recognized=(s,e)=>{
+      if(e.result.reason===sdk.ResultReason.TranslatedSpeech){
+        if(e.result.text) vi.push(e.result.text);
+        const t=e.result.translations.get('en'); if(t) en.push(t);
+      }
+    };
+    recog.canceled=(s,e)=>{ e.reason===sdk.CancellationReason.Error ? finish(new Error(azureMsg(e.errorDetails))) : finish(); };
+    recog.sessionStopped=()=>finish();
+    const to=setTimeout(()=>finish(vi.length?null:new Error('Azure phản hồi quá lâu. Thử lại sau.')),45000);
+    recog.startContinuousRecognitionAsync(()=>{}, err=>finish(new Error(azureMsg(err))));
+  });
+}
+async function handleVi(int16){
+  S.viBusy=true; render();
+  try{
+    const r=await translateVi(int16);
+    if(!r.vi||!r.en) toast('Không nghe rõ câu tiếng Việt. Hãy nói to, rõ và gần micro hơn.');
+    else { S.viText=r.vi; S.customText=r.en; S.alts=null; }
+  }catch(e){ toast(e.message||String(e),5000); }
+  S.viBusy=false; render();
+}
+
 function analyze(segs,refText){
   const words=[], fl=[], pr=[];
   let single=null;
@@ -460,6 +509,25 @@ function saveHistory(text,res){
 function bestScores(){ const m={}; history_.forEach(h=>{ m[h.text]=Math.max(m[h.text]||0,h.score); }); return m; }
 
 /* ================= Nhận xét AI (Claude) ================= */
+async function callClaude(system,user){
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{
+    'content-type':'application/json','x-api-key':settings.claudeKey.trim(),
+    'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-haiku-5-5',max_tokens:2000,system,messages:[{role:'user',content:user}]})});
+  const data=await resp.json();
+  if(!resp.ok) throw new Error(resp.status===401?'Khóa Claude không đúng. Kiểm tra trong Cài đặt.':(data.error&&data.error.message)||('Lỗi '+resp.status));
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').replace(/\*\*/g,'').trim();
+}
+async function suggestAlts(){
+  const en=S.customText.trim(); if(!en||!settings.claudeKey) return;
+  S.altsBusy=true; S.alts=null; render();
+  try{
+    const out=await callClaude('Bạn giúp người Việt diễn đạt ý bằng tiếng Anh giao tiếp tự nhiên. Chỉ trả về đúng 3 câu tiếng Anh, mỗi câu một dòng, không đánh số, không gạch đầu dòng, không giải thích.',
+      `Ý tiếng Việt: "${S.viText||'(không có)'}"\nBản dịch máy: "${en}"\nHãy đưa ra 3 cách nói tiếng Anh tự nhiên, phổ biến trong giao tiếp hằng ngày, sắp xếp từ thông dụng nhất.`);
+    S.alts=out.split('\n').map(s=>s.replace(/^[\s\-•\d.)]+/,'').trim()).filter(Boolean).slice(0,3);
+  }catch(e){ toast(e.message||String(e),5000); }
+  S.altsBusy=false; render();
+}
 async function askAI(){
   const r=S.result; if(!r||!settings.claudeKey) return;
   S.aiBusy=true; S.aiText=null; render();
@@ -473,14 +541,7 @@ async function askAI(){
   };
   const system='Bạn là giáo viên dạy phát âm tiếng Anh cho người Việt. Dựa trên kết quả chấm phát âm của Azure (JSON), viết nhận xét bằng tiếng Việt, tối đa 150 từ, giọng thân thiện và cụ thể: một câu nhận xét chung; tối đa 3 lỗi quan trọng nhất (từ nào, âm nào, người học đang phát âm gần giống âm gì, cách đặt lưỡi, môi, răng để sửa, có liên hệ lỗi điển hình của người Việt nếu phù hợp); cuối cùng một mẹo luyện tập ngắn. Viết ký hiệu IPA trong dấu /…/. Không dùng tiêu đề markdown, không in đậm; có thể dùng gạch đầu dòng ngắn. Nếu điểm đã rất tốt, khen ngắn gọn và gợi ý cách nói tự nhiên hơn.';
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{
-      'content-type':'application/json','x-api-key':settings.claudeKey.trim(),
-      'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-haiku-5-5',max_tokens:2000,system,
-        messages:[{role:'user',content:'Kết quả chấm:\n'+JSON.stringify(summary)}]})});
-    const data=await resp.json();
-    if(!resp.ok) throw new Error(resp.status===401?'Khóa Claude không đúng. Kiểm tra trong Cài đặt.':(data.error&&data.error.message)||('Lỗi '+resp.status));
-    S.aiText=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').replace(/\*\*/g,'').trim()||'Không có nhận xét.';
+    S.aiText=(await callClaude(system,'Kết quả chấm:\n'+JSON.stringify(summary)))||'Không có nhận xét.';
   }catch(e){ S.aiText=null; toast(e.message||String(e),5000); }
   S.aiBusy=false; render();
 }
@@ -527,13 +588,22 @@ function vHome(){
   };
   const topics=`<h2 class="group">Tình huống thường gặp</h2><div class="list">${TOPICS.filter(t=>t.group==='situ').map(row).join('')}</div>
     <h2 class="group">Âm khó với người Việt</h2><div class="list">${TOPICS.filter(t=>t.group==='sound').map(row).join('')}</div>`;
-  const custom=`<div class="field" style="margin-top:18px"><label for="ct">Từ hoặc câu bạn muốn luyện</label>
+  const viOn=S.recording&&S.recMode==='vi';
+  const viHint=viOn?'Đang nghe… chạm để dừng':S.viBusy?'Đang dịch sang tiếng Anh…':'Chạm micro và nói ý bạn muốn diễn đạt';
+  const custom=`<div class="vi-box"><div class="vi-head">
+      <button class="rec sm ${viOn?'on':''}" data-act="recVi" ${S.viBusy?'disabled':''} aria-label="${viOn?'Dừng ghi âm':'Nói bằng tiếng Việt'}">${viOn?ICON.stop:ICON.mic}</button>
+      <div><b>Nói bằng tiếng Việt</b><small>${viHint}</small></div></div>
+      ${S.viText?`<p class="vi-said">Bạn nói: “${esc(S.viText)}”</p>`:''}</div>
+    <div class="field" style="margin-top:18px"><label for="ct">${S.viText?'Câu tiếng Anh tương ứng (sửa được)':'Hoặc gõ từ, câu tiếng Anh bạn muốn luyện'}</label>
       <textarea id="ct" lang="en" placeholder="Ví dụ: The quarterly report is attached." autocapitalize="sentences">${esc(S.customText)}</textarea></div>
     <div class="actions"><button class="btn" data-act="practiceCustom">Luyện ngay</button>
       <button class="btn ghost" data-act="saveCustom">Lưu vào danh sách</button></div>
+    ${settings.claudeKey&&S.viText?`<div class="actions"><button class="btn ghost" data-act="alts" ${S.altsBusy?'disabled':''}>${S.altsBusy?'Đang gợi ý…':'Gợi ý cách nói tự nhiên hơn'}</button></div>`:''}
+    ${S.alts&&S.alts.length?`<h2 class="group">Chạm để chọn câu muốn luyện</h2><div class="list">${S.alts.map((a,i)=>`
+      <button class="row" data-act="pickAlt" data-i="${i}"><span class="t"><b lang="en">${esc(a)}</b></span><span class="chev">›</span></button>`).join('')}</div>`:''}
     ${mine.length?`<h2 class="group">Danh sách của tôi</h2><div class="list">${mine.map((m,i)=>`
       <div class="row" style="padding:6px 6px 6px 16px"><button class="row" style="padding:8px 0;border:0" data-act="mine" data-i="${i}">
-        <span class="t"><b lang="en">${esc(m)}</b>${best[m]!=null?`<small>Điểm cao nhất ${best[m]}</small>`:''}</span></button>
+        <span class="t"><b lang="en">${esc(m)}</b>${meanings[m]?`<small>${esc(meanings[m])}</small>`:''}${best[m]!=null?`<small>Điểm cao nhất ${best[m]}</small>`:''}</span></button>
         <button class="del" data-act="delMine" data-i="${i}" aria-label="Xóa">✕</button></div>`).join('')}</div>`:''}`;
   const notice=!settings.azureKey?`<div class="notice"><p>Để chấm điểm phát âm, app cần khóa Azure Speech. Hướng dẫn lấy khóa có trong file HUONG-DAN.</p>
     <button class="btn" data-act="go" data-v="settings">Nhập khóa</button></div>`:'';
@@ -603,6 +673,7 @@ function vPractice(){
   return `${backTop(S.title, n>1?`${S.idx+1}/${n}`:'')}<main class="wrap">
     <section class="stage">
       ${r?wordsHtml(r):`<p class="target" lang="en">${esc(text)}</p>`}
+      ${meanings[text]?`<p class="mean">${esc(meanings[text])}</p>`:''}
       <div class="listen"><button class="pill" data-act="play" ${S.recording?'disabled':''}>${ICON.play}Nghe mẫu</button>
         <button class="pill" data-act="slow" ${S.recording?'disabled':''}>${ICON.slow}Nghe chậm</button></div>
     </section>
@@ -670,9 +741,9 @@ const A={
   back:()=>{ if(history.state&&history.state.view&&history.state.view!=='home') history.back(); else go('home'); },
   tab:b=>{ S.tab=b.dataset.v; render(); },
   topic:b=>{ const t=TOPICS.find(x=>x.id===b.dataset.id); if(t) openPractice(t.items,0,t.name); },
-  practiceCustom:()=>{ const v=S.customText.trim(); if(!v) return toast('Nhập một từ hoặc câu tiếng Anh trước.'); openPractice([v],0,'Tự luyện'); },
+  practiceCustom:()=>{ const v=S.customText.trim(); if(!v) return toast('Nhập một từ hoặc câu tiếng Anh trước.'); saveMeaning(v); openPractice([v],0,'Tự luyện'); },
   saveCustom:()=>{ const v=S.customText.trim(); if(!v) return toast('Nhập một từ hoặc câu tiếng Anh trước.');
-    if(!mine.includes(v)){ mine.unshift(v); LS.set('pa.mine',mine); } S.customText=''; render(); toast('Đã lưu vào danh sách.'); },
+    saveMeaning(v); if(!mine.includes(v)){ mine.unshift(v); LS.set('pa.mine',mine); } S.customText=''; S.viText=''; S.alts=null; render(); toast('Đã lưu vào danh sách.'); },
   mine:b=>openPractice(mine.slice(),+b.dataset.i,'Danh sách của tôi'),
   delMine:b=>{ mine.splice(+b.dataset.i,1); LS.set('pa.mine',mine); render(); },
   replay:b=>openPractice([b.dataset.t],0,'Luyện lại'),
@@ -681,7 +752,10 @@ const A={
   slow:()=>speak(curText(),true).catch(e=>toast(e.message)),
   sayWord:b=>speak(b.dataset.w,false).catch(e=>toast(e.message)),
   sayWordSlow:b=>speak(b.dataset.w,true).catch(e=>toast(e.message)),
-  rec:()=>{ S.recording?stopRec():startRec(); },
+  rec:()=>{ S.recording?stopRec():startRec('assess'); },
+  recVi:()=>{ S.recording?stopRec():startRec('vi'); },
+  alts:()=>suggestAlts(),
+  pickAlt:b=>{ S.customText=S.alts[+b.dataset.i]; S.alts=null; render(); },
   word:b=>{ const i=+b.dataset.i; S.selWord=S.selWord===i?null:i; render(); },
   playMe:()=>{ if(S.myUrl) playUrl(S.myUrl); },
   compare:async()=>{ try{ await speak(curText(),false); if(S.myUrl) await playUrl(S.myUrl); }catch(e){ toast(e.message); } },
